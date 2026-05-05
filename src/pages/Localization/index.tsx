@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X, Check, Languages } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Check, Languages, Loader2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import type { LocalizedText } from '../../types';
 
@@ -15,6 +15,7 @@ export default function LocalizationPage() {
   const [value, setValue] = useState('');
   const [search, setSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   function openCreate() {
     setKey('');
@@ -32,14 +33,19 @@ export default function LocalizationPage() {
     setModal({ open: false, editing: null });
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!key.trim() || !value.trim()) return;
-    if (modal.editing) {
-      updateText(modal.editing.id, key.trim(), value.trim());
-    } else {
-      addText(key.trim(), value.trim());
+    setSaving(true);
+    try {
+      if (modal.editing) {
+        await updateText(modal.editing.id, key.trim(), value.trim());
+      } else {
+        await addText(key.trim(), value.trim());
+      }
+      closeModal();
+    } finally {
+      setSaving(false);
     }
-    closeModal();
   }
 
   const filtered = texts.filter(
@@ -133,7 +139,7 @@ export default function LocalizationPage() {
                       {deleteConfirm === t.id ? (
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => { deleteText(t.id); setDeleteConfirm(null); }}
+                            onClick={() => { deleteText(t.id).then(() => setDeleteConfirm(null)); }}
                             className="p-1.5 rounded hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors"
                             title="Confirm delete"
                           >
@@ -220,9 +226,10 @@ export default function LocalizationPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={!key.trim() || !value.trim()}
-                className="px-4 py-2 text-sm font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                disabled={saving || !key.trim() || !value.trim()}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
+                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {modal.editing ? 'Save changes' : 'Create'}
               </button>
             </div>

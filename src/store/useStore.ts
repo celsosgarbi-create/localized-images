@@ -1,20 +1,16 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type { LocalizedText, LocalizedImage, FigmaTemplate, ImageTextValue } from '../types';
 
-let textIdCounter = 1;
-let imageIdCounter = 1;
-
-function genTextId(): string {
-  return `TXT-${String(textIdCounter++).padStart(4, '0')}`;
-}
-
-function genImageId(): string {
-  return `IMG-${String(imageIdCounter++).padStart(4, '0')}`;
-}
-
-function now(): string {
-  return new Date().toISOString();
+async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? res.statusText);
+  }
+  return res.json();
 }
 
 interface StoreState {
@@ -23,119 +19,114 @@ interface StoreState {
 
   texts: LocalizedText[];
   images: LocalizedImage[];
+  loaded: boolean;
 
-  addText: (key: string, value: string) => LocalizedText;
-  updateText: (id: string, key: string, value: string) => void;
-  deleteText: (id: string) => void;
+  loadAll: () => Promise<void>;
 
-  createImage: (name: string, figmaUrl: string) => LocalizedImage;
-  updateImageTemplate: (id: string, template: FigmaTemplate) => void;
-  updateImageTextValues: (id: string, textValues: ImageTextValue[]) => void;
-  updateImageName: (id: string, name: string) => void;
-  saveImage: (id: string) => void;
-  deleteImage: (id: string) => void;
+  addText: (key: string, value: string) => Promise<LocalizedText>;
+  updateText: (id: string, key: string, value: string) => Promise<void>;
+  deleteText: (id: string) => Promise<void>;
+
+  createImage: (name: string, figmaUrl: string) => Promise<LocalizedImage>;
+  updateImageTemplate: (id: string, template: FigmaTemplate) => Promise<void>;
+  updateImageTextValues: (id: string, textValues: ImageTextValue[]) => Promise<void>;
+  updateImageName: (id: string, name: string) => Promise<void>;
+  saveImage: (id: string) => Promise<void>;
+  deleteImage: (id: string) => Promise<void>;
 }
 
-export const useStore = create<StoreState>()(
-  persist(
-    (set, get) => ({
-      figmaToken: (import.meta.env.VITE_FIGMA_TOKEN as string) || '',
-      setFigmaToken: (token) => set({ figmaToken: token }),
+export const useStore = create<StoreState>()((set, get) => ({
+  figmaToken: (import.meta.env.VITE_FIGMA_TOKEN as string) || '',
+  setFigmaToken: (token) => set({ figmaToken: token }),
 
-      texts: [],
-      images: [],
+  texts: [],
+  images: [],
+  loaded: false,
 
-      addText: (key, value) => {
-        const entry: LocalizedText = { id: genTextId(), key, value, createdAt: now() };
-        set((s) => ({ texts: [...s.texts, entry] }));
-        return entry;
-      },
+  loadAll: async () => {
+    const [texts, images] = await Promise.all([
+      api<LocalizedText[]>('/api/texts'),
+      api<LocalizedImage[]>('/api/images'),
+    ]);
+    set({ texts, images, loaded: true });
+  },
 
-      updateText: (id, key, value) => {
-        set((s) => ({
-          texts: s.texts.map((t) => (t.id === id ? { ...t, key, value } : t)),
-        }));
-      },
+  addText: async (key, value) => {
+    const text = await api<LocalizedText>('/api/texts', {
+      method: 'POST',
+      body: JSON.stringify({ key, value }),
+    });
+    set((s) => ({ texts: [...s.texts, text] }));
+    return text;
+  },
 
-      deleteText: (id) => {
-        set((s) => ({ texts: s.texts.filter((t) => t.id !== id) }));
-      },
+  updateText: async (id, key, value) => {
+    const updated = await api<LocalizedText>(`/api/texts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ key, value }),
+    });
+    set((s) => ({ texts: s.texts.map((t) => (t.id === id ? updated : t)) }));
+  },
 
-      createImage: (name, figmaUrl) => {
-        const img: LocalizedImage = {
-          id: genImageId(),
-          name,
-          figmaUrl,
-          template: null,
-          textValues: [],
-          status: 'draft',
-          createdAt: now(),
-          updatedAt: now(),
-        };
-        set((s) => ({ images: [...s.images, img] }));
-        return img;
-      },
+  deleteText: async (id) => {
+    await api(`/api/texts/${id}`, { method: 'DELETE' });
+    set((s) => ({ texts: s.texts.filter((t) => t.id !== id) }));
+  },
 
-      updateImageTemplate: (id, template) => {
-        const existing = get().images.find((i) => i.id === id);
-        const prevComponents = existing?.template?.textComponents ?? [];
-        const newComponents = template.textComponents;
-        const prevValues = existing?.textValues ?? [];
+  createImage: async (name, figmaUrl) => {
+    const image = await api<LocalizedImage>('/api/images', {
+      method: 'POST',
+      body: JSON.stringify({ name, figmaUrl }),
+    });
+    set((s) => ({ images: [...s.images, image] }));
+    return image;
+  },
 
-        const textValues: ImageTextValue[] = newComponents.map((tc) => {
-          const prev = prevValues.find((v) => v.componentId === tc.id);
-          const wasThere = prevComponents.some((p) => p.id === tc.id);
-          if (wasThere && prev) return prev;
-          return { componentId: tc.id, localizationId: null, customText: '' };
-        });
+  updateImageTemplate: async (id, template) => {
+    const existing = get().images.find((i) => i.id === id);
+    const prevComponents = existing?.template?.textComponents ?? [];
+    const prevValues = existing?.textValues ?? [];
 
-        set((s) => ({
-          images: s.images.map((img) =>
-            img.id === id ? { ...img, template, textValues, updatedAt: now() } : img,
-          ),
-        }));
-      },
+    const textValues: ImageTextValue[] = template.textComponents.map((tc) => {
+      const prev = prevValues.find((v) => v.componentId === tc.id);
+      const wasThere = prevComponents.some((p) => p.id === tc.id);
+      if (wasThere && prev) return prev;
+      return { componentId: tc.id, localizationId: null, customText: '' };
+    });
 
-      updateImageTextValues: (id, textValues) => {
-        set((s) => ({
-          images: s.images.map((img) =>
-            img.id === id ? { ...img, textValues, updatedAt: now() } : img,
-          ),
-        }));
-      },
+    const updated = await api<LocalizedImage>(`/api/images/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ template, textValues }),
+    });
+    set((s) => ({ images: s.images.map((img) => (img.id === id ? updated : img)) }));
+  },
 
-      updateImageName: (id, name) => {
-        set((s) => ({
-          images: s.images.map((img) =>
-            img.id === id ? { ...img, name, updatedAt: now() } : img,
-          ),
-        }));
-      },
+  updateImageTextValues: async (id, textValues) => {
+    const updated = await api<LocalizedImage>(`/api/images/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ textValues }),
+    });
+    set((s) => ({ images: s.images.map((img) => (img.id === id ? updated : img)) }));
+  },
 
-      saveImage: (id) => {
-        set((s) => ({
-          images: s.images.map((img) =>
-            img.id === id ? { ...img, status: 'saved', updatedAt: now() } : img,
-          ),
-        }));
-      },
+  updateImageName: async (id, name) => {
+    const updated = await api<LocalizedImage>(`/api/images/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    });
+    set((s) => ({ images: s.images.map((img) => (img.id === id ? updated : img)) }));
+  },
 
-      deleteImage: (id) => {
-        set((s) => ({ images: s.images.filter((img) => img.id !== id) }));
-      },
-    }),
-    {
-      name: 'localized-images-store',
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          textIdCounter = state.texts.length + 1;
-          imageIdCounter = state.images.length + 1;
-          // If localStorage had no token, seed from env var
-          if (!state.figmaToken && import.meta.env.VITE_FIGMA_TOKEN) {
-            state.figmaToken = import.meta.env.VITE_FIGMA_TOKEN as string;
-          }
-        }
-      },
-    },
-  ),
-);
+  saveImage: async (id) => {
+    const updated = await api<LocalizedImage>(`/api/images/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'saved' }),
+    });
+    set((s) => ({ images: s.images.map((img) => (img.id === id ? updated : img)) }));
+  },
+
+  deleteImage: async (id) => {
+    await api(`/api/images/${id}`, { method: 'DELETE' });
+    set((s) => ({ images: s.images.filter((img) => img.id !== id) }));
+  },
+}));

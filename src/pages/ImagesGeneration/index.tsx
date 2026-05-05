@@ -108,7 +108,7 @@ export default function ImagesGenerationPage() {
                       {deleteConfirm === img.id ? (
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => { deleteImage(img.id); setDeleteConfirm(null); }}
+                            onClick={() => { deleteImage(img.id).then(() => setDeleteConfirm(null)); }}
                             className="p-1.5 rounded hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors"
                             title="Confirm delete"
                           >

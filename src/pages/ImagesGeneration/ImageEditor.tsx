@@ -90,12 +90,13 @@ export default function ImageEditor() {
         : await fetchFigmaMock(figmaUrl.trim());
       let imgId = currentId;
       if (!imgId) {
-        const created = createImage(name, figmaUrl.trim());
+        const created = await createImage(name, figmaUrl.trim());
         imgId = created.id;
         setCurrentId(imgId);
       } else {
         updateImageName(imgId, name);
       }
+      if (!imgId) throw new Error('Failed to create image record');
       updateImageTemplate(imgId, tmpl);
       const freshImage = images.find((i) => i.id === imgId);
       setTextValues(freshImage?.textValues ?? tmpl.textComponents.map((tc) => ({ componentId: tc.id, localizationId: null, customText: '' })));

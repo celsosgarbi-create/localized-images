@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   ExternalLink,
   Box,
+  KeyRound,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { fetchFigmaTemplate as fetchFigmaMock, EXAMPLE_FIGMA_URLS } from '../../mocks/figma';
@@ -159,103 +160,113 @@ export default function ImageEditor() {
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
-      <div className="flex items-center gap-4 px-6 py-4 bg-white border-b border-gray-200 flex-shrink-0">
-        <button
-          onClick={() => navigate('/images')}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="text-base font-semibold text-gray-900 bg-transparent border-none outline-none focus:bg-gray-50 px-2 py-1 rounded-lg w-64"
-          placeholder="Image name…"
-        />
-        <div className="flex-1" />
-        {hasFetched && (
+      <div className="flex-shrink-0 bg-white border-b border-gray-200">
+        <div className="flex items-center gap-4 px-6 py-3">
           <button
-            onClick={handleSave}
-            disabled={saving || !currentId}
-            className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            onClick={() => navigate('/images')}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
           >
-            {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : saved ? (
-              <CheckCircle2 className="w-4 h-4" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
+            <ArrowLeft className="w-4 h-4" />
           </button>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="text-base font-semibold text-gray-900 bg-transparent border-none outline-none focus:bg-gray-50 px-2 py-1 rounded-lg w-64"
+            placeholder="Image name…"
+          />
+          <div className="flex-1" />
+
+          {/* Token button in header */}
+          {figmaToken ? (
+            <button
+              onClick={() => { setTokenInput(figmaToken); setShowTokenInput(!showTokenInput); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              Token set
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowTokenInput(!showTokenInput)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              Add Figma token
+            </button>
+          )}
+
+          {hasFetched && (
+            <button
+              onClick={handleSave}
+              disabled={saving || !currentId}
+              className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : saved ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
+            </button>
+          )}
+        </div>
+
+        {/* Token input panel — drops down from header */}
+        {showTokenInput && (
+          <div className="px-6 py-4 border-t border-amber-100 bg-amber-50">
+            <div className="flex items-start gap-3 max-w-2xl">
+              <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-gray-800 mb-1">Figma personal access token</p>
+                <p className="text-xs text-gray-500 mb-3">
+                  Required for real Figma integration.{' '}
+                  <a
+                    href="https://www.figma.com/settings"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-violet-600 hover:underline"
+                  >
+                    Go to figma.com/settings
+                  </a>{' '}
+                  → "Personal access tokens" → generate a token and paste it here.
+                  Without a token the tool uses mock data.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={tokenInput}
+                    onChange={(e) => setTokenInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveToken()}
+                    placeholder="figd_xxxxxxxxxxxxxxxxxxxx"
+                    className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 font-mono bg-white"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSaveToken}
+                    disabled={!tokenInput.trim()}
+                    className="px-4 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                  >
+                    Save token
+                  </button>
+                  <button
+                    onClick={() => setShowTokenInput(false)}
+                    className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Preview */}
         <div className="flex-1 flex flex-col overflow-auto bg-gray-100 p-6">
-          {/* Figma token */}
-          {showTokenInput ? (
-            <div className="mb-4 p-4 bg-white rounded-xl border border-amber-200 shadow-sm">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-800 mb-0.5">Figma personal access token</p>
-                  <p className="text-xs text-gray-500 mb-3">
-                    Required for real Figma integration.{' '}
-                    <a
-                      href="https://www.figma.com/settings"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-violet-600 hover:underline"
-                    >
-                      Generate one at figma.com/settings
-                    </a>{' '}
-                    under "Personal access tokens". Without a token the tool uses mock data.
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={tokenInput}
-                      onChange={(e) => setTokenInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSaveToken()}
-                      placeholder="figd_…"
-                      className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 font-mono"
-                    />
-                    <button
-                      onClick={handleSaveToken}
-                      className="px-3 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-                    >
-                      Save
-                    </button>
-                    {figmaToken && (
-                      <button
-                        onClick={() => setShowTokenInput(false)}
-                        className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 mb-4">
-              <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-                <CheckCircle2 className="w-3 h-3" />
-                Figma token set
-              </span>
-              <button
-                onClick={() => { setTokenInput(figmaToken); setShowTokenInput(true); }}
-                className="text-xs text-gray-400 hover:text-gray-600 underline"
-              >
-                Change
-              </button>
-            </div>
-          )}
-
           {/* Figma URL bar */}
           <div className="flex gap-2 mb-6">
             <div className="flex items-center gap-2 flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">

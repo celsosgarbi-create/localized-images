@@ -98,8 +98,13 @@ export default function ImageEditor() {
       }
       if (!imgId) throw new Error('Failed to create image record');
       updateImageTemplate(imgId, tmpl);
-      const freshImage = images.find((i) => i.id === imgId);
-      setTextValues(freshImage?.textValues ?? tmpl.textComponents.map((tc) => ({ componentId: tc.id, localizationId: null, customText: '' })));
+      // Preserve existing bindings for components that are still in the new template
+      setTextValues(
+        tmpl.textComponents.map((tc) => {
+          const existing = textValues.find((tv) => tv.componentId === tc.id);
+          return existing ?? { componentId: tc.id, localizationId: null, customText: '' };
+        }),
+      );
       setFetchSuccess(true);
       setTimeout(() => setFetchSuccess(false), 3000);
     } catch (err) {

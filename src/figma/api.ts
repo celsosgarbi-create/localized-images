@@ -120,10 +120,9 @@ function extractTextComponents(rootNode: FigmaNode): FigmaTextComponent[] {
 
   console.log('[Figma] root node:', rootNode.id, rootNode.name, rootNode.type);
   console.log('[Figma] root children count:', rootNode.children?.length ?? 0);
-  console.log('[Figma] root children:', rootNode.children?.map(
-    (c) => `${c.name} | type=${c.type} | bbox=${JSON.stringify(c.absoluteBoundingBox)} | renderBounds=${JSON.stringify(c.absoluteRenderBounds)} | size=${JSON.stringify(c.size)}`
-  ));
-  console.log('[Figma] localization nodes found:', nodes.length, nodes.map((n) => `${n.name} bbox=${JSON.stringify(n.absoluteBoundingBox)}`));
+  // Full dump — expand in DevTools to inspect
+  console.log('[Figma] root children (raw):', rootNode.children);
+  console.log('[Figma] localization nodes found:', nodes.length, nodes.map((n) => `${n.name} | type=${n.type} | bbox=${JSON.stringify(n.absoluteBoundingBox)}`));
 
   // Filter to nodes that have a usable bounding box
   const usable = nodes.filter((n) => n.absoluteBoundingBox);
@@ -181,9 +180,11 @@ export async function fetchFigmaTemplate(url: string, token: string): Promise<Fi
   // Fetch node tree and rendered image in parallel
   const encodedNodeId = encodeURIComponent(nodeId);
 
+  console.log('[Figma] fetching nodeId:', nodeId, 'fileKey:', fileKey);
+
   const [nodeData, imageData] = await Promise.all([
     figmaGet<{ nodes: Record<string, { document: FigmaNode }> }>(
-      `/files/${fileKey}/nodes?ids=${encodedNodeId}&geometry=paths`,
+      `/files/${fileKey}/nodes?ids=${encodedNodeId}`,
       token,
     ),
     figmaGet<{ images: Record<string, string> }>(
@@ -192,8 +193,8 @@ export async function fetchFigmaTemplate(url: string, token: string): Promise<Fi
     ),
   ]);
 
+  console.log('[Figma] nodes response keys:', Object.keys(nodeData.nodes));
   console.log('[Figma] requested nodeId:', nodeId);
-  console.log('[Figma] response node keys:', Object.keys(nodeData.nodes));
   const nodeEntry = nodeData.nodes[nodeId];
   if (!nodeEntry) {
     // Try alternative key formats (Figma sometimes uses hyphen vs colon)

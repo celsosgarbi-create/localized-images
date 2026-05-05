@@ -65,44 +65,47 @@ export function parseFigmaUrl(url: string): ParsedFigmaUrl {
   return { fileKey, nodeId };
 }
 
-function colorToHex(color: FigmaColor): string {
-  const r = Math.round(color.r * 255).toString(16).padStart(2, '0');
-  const g = Math.round(color.g * 255).toString(16).padStart(2, '0');
-  const b = Math.round(color.b * 255).toString(16).padStart(2, '0');
-  return `#${r}${g}${b}`;
-}
 
-function collectTextNodes(node: FigmaNode, result: FigmaNode[] = []): FigmaNode[] {
-  if (node.type === 'TEXT') {
+function collectLocalizationNodes(node: FigmaNode, result: FigmaNode[] = []): FigmaNode[] {
+  if (node.name.toLowerCase().includes('localization') && node.absoluteBoundingBox) {
     result.push(node);
   }
+  // Keep traversing — localization nodes can be nested anywhere
   if (node.children) {
     for (const child of node.children) {
-      collectTextNodes(child, result);
+      collectLocalizationNodes(child, result);
     }
   }
   return result;
+}
+
+function fillColor(node: FigmaNode): string {
+  // Use the rectangle's fill color to decide text color (invert luminance)
+  const fill = node.fills?.find((f) => f.type === 'SOLID' && f.color);
+  if (!fill?.color) return '#ffffff';
+  const { r, g, b } = fill.color;
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance > 0.5 ? '#1a1a1a' : '#ffffff';
 }
 
 function extractTextComponents(rootNode: FigmaNode): FigmaTextComponent[] {
   const frame = rootNode.absoluteBoundingBox;
   if (!frame) throw new Error('Root node has no bounding box.');
 
-  const textNodes = collectTextNodes(rootNode);
+  const nodes = collectLocalizationNodes(rootNode);
 
-  return textNodes.map((node) => {
-    const box = node.absoluteBoundingBox ?? { x: frame.x, y: frame.y, width: 200, height: 40 };
-    const style = node.style ?? {};
-    const fill = style.fills?.find((f) => f.type === 'SOLID' && f.color);
-    const color = fill?.color ? colorToHex(fill.color) : '#000000';
+  if (nodes.length === 0) {
+    throw new Error(
+      'No "localization" rectangles found in this frame. ' +
+      'Add rectangle shapes in Figma and name them containing the word "localization".'
+    );
+  }
 
-    const align = style.textAlignHorizontal ?? 'LEFT';
-    const alignMap: Record<string, 'left' | 'center' | 'right'> = {
-      LEFT: 'left',
-      CENTER: 'center',
-      RIGHT: 'right',
-      JUSTIFIED: 'left',
-    };
+  return nodes.map((node) => {
+    const box = node.absoluteBoundingBox!;
+    const color = fillColor(node);
+    // Font size ~55% of box height, capped so it looks natural
+    const fontSize = Math.round(Math.min(box.height * 0.55, 72));
 
     return {
       id: node.id,
@@ -110,10 +113,11 @@ function extractTextComponents(rootNode: FigmaNode): FigmaTextComponent[] {
       xPercent: ((box.x - frame.x) / frame.width) * 100,
       yPercent: ((box.y - frame.y) / frame.height) * 100,
       widthPercent: (box.width / frame.width) * 100,
-      fontSize: style.fontSize ?? 16,
+      heightPercent: (box.height / frame.height) * 100,
+      fontSize,
       color,
-      align: alignMap[align] ?? 'left',
-      fontWeight: (style.fontWeight ?? 400) >= 600 ? 'bold' : 'normal',
+      align: 'center',
+      fontWeight: 'normal',
     };
   });
 }

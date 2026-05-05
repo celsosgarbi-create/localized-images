@@ -11,6 +11,7 @@ export interface FigmaTextComponent {
   xPercent: number;
   yPercent: number;
   widthPercent: number;
+  heightPercent: number;
   fontSize: number;
   color: string;
   align: 'left' | 'center' | 'right';

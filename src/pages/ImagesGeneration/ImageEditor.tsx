@@ -86,7 +86,15 @@ export default function ImageEditor() {
     setFetchSuccess(false);
     try {
       const token = getEffectiveToken(figmaToken);
-      const tmpl = token
+      const isRealFigmaUrl = figmaUrl.includes('figma.com');
+
+      console.log('[Figma fetch] token present:', !!token, '| real URL:', isRealFigmaUrl);
+
+      if (isRealFigmaUrl && !token) {
+        throw new Error('No Figma token found. Click "Add Figma token" in the header, or set VITE_FIGMA_TOKEN in your .env.local and restart the dev server.');
+      }
+
+      const tmpl = isRealFigmaUrl
         ? await fetchFigmaReal(figmaUrl.trim(), token)
         : await fetchFigmaMock(figmaUrl.trim());
       let imgId = currentId;
@@ -224,7 +232,7 @@ export default function ImageEditor() {
               <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-gray-800 mb-1">Figma personal access token</p>
-                <p className="text-xs text-gray-500 mb-3">
+                <p className="text-xs text-gray-500 mb-2">
                   Required for real Figma integration.{' '}
                   <a
                     href="https://www.figma.com/settings"
@@ -235,7 +243,12 @@ export default function ImageEditor() {
                     Go to figma.com/settings
                   </a>{' '}
                   → "Personal access tokens" → generate a token and paste it here.
-                  Without a token the tool uses mock data.
+                </p>
+                <p className="text-xs mb-3">
+                  {import.meta.env.VITE_FIGMA_TOKEN
+                    ? <span className="text-emerald-600 font-medium">✓ VITE_FIGMA_TOKEN detected in .env.local</span>
+                    : <span className="text-amber-700 font-medium">✗ VITE_FIGMA_TOKEN not detected — check .env.local and restart the dev server</span>
+                  }
                 </p>
                 <div className="flex gap-2">
                   <input

@@ -67,10 +67,9 @@ export function parseFigmaUrl(url: string): ParsedFigmaUrl {
 
 
 function collectLocalizationNodes(node: FigmaNode, result: FigmaNode[] = []): FigmaNode[] {
-  if (node.name.toLowerCase().includes('localization') && node.absoluteBoundingBox) {
+  if (node.name.toLowerCase().includes('localization')) {
     result.push(node);
   }
-  // Keep traversing — localization nodes can be nested anywhere
   if (node.children) {
     for (const child of node.children) {
       collectLocalizationNodes(child, result);
@@ -94,17 +93,30 @@ function extractTextComponents(rootNode: FigmaNode): FigmaTextComponent[] {
 
   const nodes = collectLocalizationNodes(rootNode);
 
-  if (nodes.length === 0) {
+  console.log('[Figma] root node:', rootNode.id, rootNode.name, rootNode.type);
+  console.log('[Figma] root children:', rootNode.children?.map((c) => `${c.name} (${c.type})`));
+  console.log('[Figma] localization nodes found:', nodes.length, nodes.map((n) => `${n.name} bbox=${JSON.stringify(n.absoluteBoundingBox)}`));
+
+  // Filter to nodes that have a usable bounding box
+  const usable = nodes.filter((n) => n.absoluteBoundingBox);
+
+  if (usable.length === 0 && nodes.length > 0) {
     throw new Error(
-      'No "localization" rectangles found in this frame. ' +
-      'Add rectangle shapes in Figma and name them containing the word "localization".'
+      `Found ${nodes.length} "localization" rectangle(s) but none had position data (absoluteBoundingBox missing). ` +
+      'This can happen with deeply nested components. Try flattening the localization rectangles to be direct children of the frame.',
     );
   }
 
-  return nodes.map((node) => {
+  if (usable.length === 0) {
+    throw new Error(
+      'No "localization" rectangles found in this frame. ' +
+      'Add rectangle shapes in Figma and name them containing the word "localization".',
+    );
+  }
+
+  return usable.map((node) => {
     const box = node.absoluteBoundingBox!;
     const color = fillColor(node);
-    // Font size ~55% of box height, capped so it looks natural
     const fontSize = Math.round(Math.min(box.height * 0.55, 72));
 
     return {
@@ -143,7 +155,7 @@ export async function fetchFigmaTemplate(url: string, token: string): Promise<Fi
 
   const [nodeData, imageData] = await Promise.all([
     figmaGet<{ nodes: Record<string, { document: FigmaNode }> }>(
-      `/files/${fileKey}/nodes?ids=${encodedNodeId}`,
+      `/files/${fileKey}/nodes?ids=${encodedNodeId}&depth=99`,
       token,
     ),
     figmaGet<{ images: Record<string, string> }>(
@@ -152,9 +164,22 @@ export async function fetchFigmaTemplate(url: string, token: string): Promise<Fi
     ),
   ]);
 
+  console.log('[Figma] requested nodeId:', nodeId);
+  console.log('[Figma] response node keys:', Object.keys(nodeData.nodes));
   const nodeEntry = nodeData.nodes[nodeId];
   if (!nodeEntry) {
-    throw new Error('Node not found in Figma response. Make sure the node-id in the URL is correct.');
+    // Try alternative key formats (Figma sometimes uses hyphen vs colon)
+    const altKey = Object.keys(nodeData.nodes)[0];
+    if (!altKey) throw new Error('Node not found in Figma response. Make sure the node-id in the URL is correct.');
+    console.warn('[Figma] nodeId not found directly, falling back to first key:', altKey);
+    const fallbackEntry = nodeData.nodes[altKey];
+    const fallbackRoot = fallbackEntry.document;
+    const fallbackFrame = fallbackRoot.absoluteBoundingBox;
+    if (!fallbackFrame) throw new Error('Selected node has no dimensions.');
+    const fallbackImageUrl = imageData.images[altKey] ?? imageData.images[nodeId];
+    if (!fallbackImageUrl) throw new Error('Figma could not render this node as an image.');
+    const textComponents = extractTextComponents(fallbackRoot);
+    return { imageUrl: fallbackImageUrl, width: fallbackFrame.width, height: fallbackFrame.height, textComponents, fetchedAt: new Date().toISOString() };
   }
   const rootNode = nodeEntry.document;
   const frame = rootNode.absoluteBoundingBox;

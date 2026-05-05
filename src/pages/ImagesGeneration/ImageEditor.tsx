@@ -354,23 +354,27 @@ export default function ImageEditor() {
                 {template.textComponents.map((tc) => {
                   const tv = textValues.find((v) => v.componentId === tc.id);
                   const display = tv ? resolveText(tv) : '';
-                  if (!display) return null;
                   return (
                     <div
                       key={tc.id}
-                      className="absolute pointer-events-none select-text"
+                      className="absolute select-text"
                       style={{
                         left: `${tc.xPercent}%`,
                         top: `${tc.yPercent}%`,
                         width: `${tc.widthPercent}%`,
                         fontSize: `clamp(10px, ${tc.fontSize / template.width * 100 * 8}vw, ${tc.fontSize}px)`,
-                        color: tc.color,
+                        color: display ? tc.color : 'transparent',
                         fontWeight: tc.fontWeight,
                         textAlign: tc.align,
                         lineHeight: 1.2,
-                        textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                        textShadow: display ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
                         fontFamily: 'system-ui, -apple-system, sans-serif',
+                        outline: display ? 'none' : '1.5px dashed rgba(255,255,255,0.5)',
+                        minHeight: '1em',
+                        borderRadius: '2px',
+                        pointerEvents: 'none',
                       }}
+                      title={!display ? tc.name : undefined}
                     >
                       {display}
                     </div>

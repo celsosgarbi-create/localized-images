@@ -16,6 +16,7 @@ import {
 import { useStore } from '../../store/useStore';
 import { fetchFigmaTemplate as fetchFigmaMock, EXAMPLE_FIGMA_URLS } from '../../mocks/figma';
 import { fetchFigmaTemplate as fetchFigmaReal } from '../../figma/api';
+import { getEffectiveToken } from '../../figma/token';
 import type { ImageTextValue, LocalizedText } from '../../types';
 
 export default function ImageEditor() {
@@ -84,7 +85,7 @@ export default function ImageEditor() {
     setFetchError(null);
     setFetchSuccess(false);
     try {
-      const token = figmaToken || import.meta.env.VITE_FIGMA_TOKEN || '';
+      const token = getEffectiveToken(figmaToken);
       const tmpl = token
         ? await fetchFigmaReal(figmaUrl.trim(), token)
         : await fetchFigmaMock(figmaUrl.trim());
@@ -151,7 +152,7 @@ export default function ImageEditor() {
   }
 
   const hasFetched = !!template;
-  const effectiveToken = figmaToken || import.meta.env.VITE_FIGMA_TOKEN || '';
+  const effectiveToken = getEffectiveToken(figmaToken);
   const filteredTexts = texts.filter(
     (t) =>
       t.key.toLowerCase().includes(dropdownSearch.toLowerCase()) ||

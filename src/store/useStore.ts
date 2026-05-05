@@ -39,7 +39,7 @@ interface StoreState {
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
-      figmaToken: '',
+      figmaToken: (import.meta.env.VITE_FIGMA_TOKEN as string) || '',
       setFigmaToken: (token) => set({ figmaToken: token }),
 
       texts: [],
@@ -130,6 +130,10 @@ export const useStore = create<StoreState>()(
         if (state) {
           textIdCounter = state.texts.length + 1;
           imageIdCounter = state.images.length + 1;
+          // If localStorage had no token, seed from env var
+          if (!state.figmaToken && import.meta.env.VITE_FIGMA_TOKEN) {
+            state.figmaToken = import.meta.env.VITE_FIGMA_TOKEN as string;
+          }
         }
       },
     },

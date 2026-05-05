@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   ExternalLink,
   Box,
-  KeyRound,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { fetchFigmaTemplate as fetchFigmaMock, EXAMPLE_FIGMA_URLS } from '../../mocks/figma';
@@ -28,7 +27,6 @@ export default function ImageEditor() {
     images,
     texts,
     figmaToken,
-    setFigmaToken,
     createImage,
     updateImageTemplate,
     updateImageTextValues,
@@ -36,8 +34,6 @@ export default function ImageEditor() {
     saveImage,
   } = useStore();
 
-  const [tokenInput, setTokenInput] = useState(figmaToken);
-  const [showTokenInput, setShowTokenInput] = useState(!figmaToken);
 
   const image = isNew ? null : images.find((i) => i.id === id);
 
@@ -73,11 +69,6 @@ export default function ImageEditor() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
-
-  function handleSaveToken() {
-    setFigmaToken(tokenInput.trim());
-    setShowTokenInput(false);
-  }
 
   async function handleFetch() {
     if (!figmaUrl.trim()) return;
@@ -160,7 +151,6 @@ export default function ImageEditor() {
   }
 
   const hasFetched = !!template;
-  const effectiveToken = getEffectiveToken(figmaToken);
   const filteredTexts = texts.filter(
     (t) =>
       t.key.toLowerCase().includes(dropdownSearch.toLowerCase()) ||
@@ -188,25 +178,6 @@ export default function ImageEditor() {
           />
           <div className="flex-1" />
 
-          {/* Token button in header */}
-          {effectiveToken ? (
-            <button
-              onClick={() => { setTokenInput(figmaToken); setShowTokenInput(!showTokenInput); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              Token set
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowTokenInput(!showTokenInput)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              Add Figma token
-            </button>
-          )}
-
           {hasFetched && (
             <button
               onClick={handleSave}
@@ -225,59 +196,6 @@ export default function ImageEditor() {
           )}
         </div>
 
-        {/* Token input panel — drops down from header */}
-        {showTokenInput && (
-          <div className="px-6 py-4 border-t border-amber-100 bg-amber-50">
-            <div className="flex items-start gap-3 max-w-2xl">
-              <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-gray-800 mb-1">Figma personal access token</p>
-                <p className="text-xs text-gray-500 mb-2">
-                  Required for real Figma integration.{' '}
-                  <a
-                    href="https://www.figma.com/settings"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-violet-600 hover:underline"
-                  >
-                    Go to figma.com/settings
-                  </a>{' '}
-                  → "Personal access tokens" → generate a token and paste it here.
-                </p>
-                <p className="text-xs mb-3">
-                  {import.meta.env.VITE_FIGMA_TOKEN
-                    ? <span className="text-emerald-600 font-medium">✓ VITE_FIGMA_TOKEN detected in .env.local</span>
-                    : <span className="text-amber-700 font-medium">✗ VITE_FIGMA_TOKEN not detected — check .env.local and restart the dev server</span>
-                  }
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSaveToken()}
-                    placeholder="figd_xxxxxxxxxxxxxxxxxxxx"
-                    className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 font-mono bg-white"
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleSaveToken}
-                    disabled={!tokenInput.trim()}
-                    className="px-4 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-40 transition-colors"
-                  >
-                    Save token
-                  </button>
-                  <button
-                    onClick={() => setShowTokenInput(false)}
-                    className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="flex flex-1 overflow-hidden">

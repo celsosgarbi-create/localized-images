@@ -13,7 +13,8 @@ import {
   Box,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { fetchFigmaTemplate, EXAMPLE_FIGMA_URLS } from '../../mocks/figma';
+import { fetchFigmaTemplate as fetchFigmaMock, EXAMPLE_FIGMA_URLS } from '../../mocks/figma';
+import { fetchFigmaTemplate as fetchFigmaReal } from '../../figma/api';
 import type { ImageTextValue, LocalizedText } from '../../types';
 
 export default function ImageEditor() {
@@ -24,12 +25,17 @@ export default function ImageEditor() {
   const {
     images,
     texts,
+    figmaToken,
+    setFigmaToken,
     createImage,
     updateImageTemplate,
     updateImageTextValues,
     updateImageName,
     saveImage,
   } = useStore();
+
+  const [tokenInput, setTokenInput] = useState(figmaToken);
+  const [showTokenInput, setShowTokenInput] = useState(!figmaToken);
 
   const image = isNew ? null : images.find((i) => i.id === id);
 
@@ -66,13 +72,20 @@ export default function ImageEditor() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  function handleSaveToken() {
+    setFigmaToken(tokenInput.trim());
+    setShowTokenInput(false);
+  }
+
   async function handleFetch() {
     if (!figmaUrl.trim()) return;
     setFetching(true);
     setFetchError(null);
     setFetchSuccess(false);
     try {
-      const tmpl = await fetchFigmaTemplate(figmaUrl.trim());
+      const tmpl = figmaToken
+        ? await fetchFigmaReal(figmaUrl.trim(), figmaToken)
+        : await fetchFigmaMock(figmaUrl.trim());
       let imgId = currentId;
       if (!imgId) {
         const created = createImage(name, figmaUrl.trim());
@@ -182,6 +195,67 @@ export default function ImageEditor() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Preview */}
         <div className="flex-1 flex flex-col overflow-auto bg-gray-100 p-6">
+          {/* Figma token */}
+          {showTokenInput ? (
+            <div className="mb-4 p-4 bg-white rounded-xl border border-amber-200 shadow-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-800 mb-0.5">Figma personal access token</p>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Required for real Figma integration.{' '}
+                    <a
+                      href="https://www.figma.com/settings"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-violet-600 hover:underline"
+                    >
+                      Generate one at figma.com/settings
+                    </a>{' '}
+                    under "Personal access tokens". Without a token the tool uses mock data.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={tokenInput}
+                      onChange={(e) => setTokenInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveToken()}
+                      placeholder="figd_…"
+                      className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 font-mono"
+                    />
+                    <button
+                      onClick={handleSaveToken}
+                      className="px-3 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                    >
+                      Save
+                    </button>
+                    {figmaToken && (
+                      <button
+                        onClick={() => setShowTokenInput(false)}
+                        className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 mb-4">
+              <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                <CheckCircle2 className="w-3 h-3" />
+                Figma token set
+              </span>
+              <button
+                onClick={() => { setTokenInput(figmaToken); setShowTokenInput(true); }}
+                className="text-xs text-gray-400 hover:text-gray-600 underline"
+              >
+                Change
+              </button>
+            </div>
+          )}
+
           {/* Figma URL bar */}
           <div className="flex gap-2 mb-6">
             <div className="flex items-center gap-2 flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
@@ -217,10 +291,10 @@ export default function ImageEditor() {
             </button>
           </div>
 
-          {/* Example URLs */}
-          {!hasFetched && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              <span className="text-xs text-gray-400">Try:</span>
+          {/* Example URLs — only shown in mock mode */}
+          {!hasFetched && !figmaToken && (
+            <div className="mb-4 flex flex-wrap gap-2 items-center">
+              <span className="text-xs text-gray-400">Mock examples:</span>
               {EXAMPLE_FIGMA_URLS.map((url) => (
                 <button
                   key={url}

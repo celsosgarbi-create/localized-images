@@ -18,6 +18,9 @@ function now(): string {
 }
 
 interface StoreState {
+  figmaToken: string;
+  setFigmaToken: (token: string) => void;
+
   texts: LocalizedText[];
   images: LocalizedImage[];
 
@@ -36,6 +39,9 @@ interface StoreState {
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
+      figmaToken: '',
+      setFigmaToken: (token) => set({ figmaToken: token }),
+
       texts: [],
       images: [],
 

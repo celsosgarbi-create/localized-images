@@ -84,8 +84,9 @@ export default function ImageEditor() {
     setFetchError(null);
     setFetchSuccess(false);
     try {
-      const tmpl = figmaToken
-        ? await fetchFigmaReal(figmaUrl.trim(), figmaToken)
+      const token = figmaToken || import.meta.env.VITE_FIGMA_TOKEN || '';
+      const tmpl = token
+        ? await fetchFigmaReal(figmaUrl.trim(), token)
         : await fetchFigmaMock(figmaUrl.trim());
       let imgId = currentId;
       if (!imgId) {
@@ -150,6 +151,7 @@ export default function ImageEditor() {
   }
 
   const hasFetched = !!template;
+  const effectiveToken = figmaToken || import.meta.env.VITE_FIGMA_TOKEN || '';
   const filteredTexts = texts.filter(
     (t) =>
       t.key.toLowerCase().includes(dropdownSearch.toLowerCase()) ||
@@ -178,7 +180,7 @@ export default function ImageEditor() {
           <div className="flex-1" />
 
           {/* Token button in header */}
-          {figmaToken ? (
+          {effectiveToken ? (
             <button
               onClick={() => { setTokenInput(figmaToken); setShowTokenInput(!showTokenInput); }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"

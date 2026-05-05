@@ -19,6 +19,9 @@ interface FigmaNode {
   name: string;
   type: string;
   absoluteBoundingBox?: FigmaBoundingBox;
+  absoluteRenderBounds?: FigmaBoundingBox;
+  size?: { x: number; y: number };
+  relativeTransform?: [[number, number, number], [number, number, number]];
   style?: {
     fontSize?: number;
     fontWeight?: number;
@@ -66,13 +69,35 @@ export function parseFigmaUrl(url: string): ParsedFigmaUrl {
 }
 
 
-function collectLocalizationNodes(node: FigmaNode, result: FigmaNode[] = []): FigmaNode[] {
+function resolveBbox(node: FigmaNode, parentBbox?: FigmaBoundingBox): FigmaBoundingBox | undefined {
+  if (node.absoluteBoundingBox) return node.absoluteBoundingBox;
+  if (node.absoluteRenderBounds) return node.absoluteRenderBounds;
+  // Compute from relativeTransform + size when parent bbox is known
+  if (node.size && node.relativeTransform && parentBbox) {
+    return {
+      x: parentBbox.x + node.relativeTransform[0][2],
+      y: parentBbox.y + node.relativeTransform[1][2],
+      width: node.size.x,
+      height: node.size.y,
+    };
+  }
+  return undefined;
+}
+
+function collectLocalizationNodes(
+  node: FigmaNode,
+  result: FigmaNode[] = [],
+  parentBbox?: FigmaBoundingBox,
+): FigmaNode[] {
+  const bbox = resolveBbox(node, parentBbox);
   if (node.name.toLowerCase().includes('localization')) {
+    // Attach resolved bbox so extractTextComponents can use it
+    if (bbox && !node.absoluteBoundingBox) node.absoluteBoundingBox = bbox;
     result.push(node);
   }
   if (node.children) {
     for (const child of node.children) {
-      collectLocalizationNodes(child, result);
+      collectLocalizationNodes(child, result, bbox ?? parentBbox);
     }
   }
   return result;
@@ -94,7 +119,10 @@ function extractTextComponents(rootNode: FigmaNode): FigmaTextComponent[] {
   const nodes = collectLocalizationNodes(rootNode);
 
   console.log('[Figma] root node:', rootNode.id, rootNode.name, rootNode.type);
-  console.log('[Figma] root children:', rootNode.children?.map((c) => `${c.name} (${c.type})`));
+  console.log('[Figma] root children count:', rootNode.children?.length ?? 0);
+  console.log('[Figma] root children:', rootNode.children?.map(
+    (c) => `${c.name} | type=${c.type} | bbox=${JSON.stringify(c.absoluteBoundingBox)} | renderBounds=${JSON.stringify(c.absoluteRenderBounds)} | size=${JSON.stringify(c.size)}`
+  ));
   console.log('[Figma] localization nodes found:', nodes.length, nodes.map((n) => `${n.name} bbox=${JSON.stringify(n.absoluteBoundingBox)}`));
 
   // Filter to nodes that have a usable bounding box
@@ -155,7 +183,7 @@ export async function fetchFigmaTemplate(url: string, token: string): Promise<Fi
 
   const [nodeData, imageData] = await Promise.all([
     figmaGet<{ nodes: Record<string, { document: FigmaNode }> }>(
-      `/files/${fileKey}/nodes?ids=${encodedNodeId}&depth=99`,
+      `/files/${fileKey}/nodes?ids=${encodedNodeId}&geometry=paths`,
       token,
     ),
     figmaGet<{ images: Record<string, string> }>(
